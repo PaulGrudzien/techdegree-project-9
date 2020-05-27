@@ -8,21 +8,87 @@ const authenticateUser = require("./authenticateUser.js")
 const {User, Course} = db.models;
 const router = express.Router();
 
+// this function replace the attribut userId by the attribut owner containing an user object
+async function appendUser(course) {
+    const {userId, ...values} = course.dataValues;
+    const owner = await User.findOne({
+        attributes: ['firstName', 'lastName', 'emailAddress'],
+        where : { id: userId }
+    });
+    return {...values, owner};
+}
+
+
+// list all courses. No auth
 router.get('/courses', asyncHandler(async (req, res) => {
-    const courses = await Course.findAll({order: [ ['title', 'ASC'] ]});
-    for(let i=0 ; i<courses.length ; i++) {
-        courses[i].owner = await User.findByPk(courses[i].userId)
+    const courses = await Course.findAll({
+        attributes: ['id', 'title', 'description', 'estimatedTime', 'materialsNeeded', 'userId'],
+        order: [ ['title', 'ASC'] ]
+    });
+    if (courses) {
+        Promise.all(courses.map(appendUser))
+            .then(courses => res.json(courses))
+    } else {
+        throw new Error('Server Error')
     }
-    res.json(courses)
 }));
 
+// create a course. Auth needed
+router.post('/courses', authenticateUser, asyncHandler(async (req, res) => {
+    const user = req.currentUser;
+    const course = req.body;
+    course.userId = user.id;
+    await Course.create(course);
+    res.location('/').status(201).end();
+}));
+
+// get a course by id. No auth
 router.get('/courses/:id', asyncHandler(async (req, res) => {
+    const course = await Course.findOne({
+        attributes: ['title', 'description', 'estimatedTime', 'materialsNeeded', 'userId'],
+        where : { id: req.params.id }
+    });
+    if (course) {
+        const result = await appendUser(course)
+        res.json(result);
+    } else {
+        throw new Error('Server Error')
+    }
+}));
+
+// update a course. Auth needed
+router.put('/courses/:id', authenticateUser, asyncHandler(async (req, res) => {
+    const user = req.currentUser;
     const course = await Course.findByPk(req.params.id);
     if (course) {
-        owner = await User.findByPk(course.userId);
-        res.json(course);
+        if (course.userId == user.id) {
+            await course.update(req.body);
+            res.location('/').status(204).end();
+        } else {
+            const error = new Error('You are not allowed to update this course!')
+            error.status = 403
+            throw error
+        }
     } else {
-        res.status(500).json({ message: 'Server Error' });
+        throw new Error('Server Error')
+    }
+}));
+
+// delete a course. Auth needed
+router.delete('/courses/:id', authenticateUser, asyncHandler(async (req, res) => {
+    const user = req.currentUser;
+    const course = await Course.findByPk(req.params.id);
+    if (course) {
+        if (course.userId == user.id) {
+            await course.destroy();
+            res.location('/').status(204).end();
+        } else {
+            const error = new Error('You are not allowed to delate this course!')
+            error.status = 403
+            throw error
+        }
+    } else {
+        throw new Error('Server Error')
     }
 }));
 

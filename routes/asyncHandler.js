@@ -3,7 +3,13 @@ function asyncHandler(callback) {
         try {
             await callback(req, res, next);
         } catch (error) {
-            next(error);
+            if(["SequelizeValidationError", "SequelizeUniqueConstraintError"].includes(error.name)) {
+                error.status = 400;
+                error.message = error.errors.map(error => error.message).join(" - ");
+                next(error);
+            } else {
+                next(error)
+            }
         }
     }
 };

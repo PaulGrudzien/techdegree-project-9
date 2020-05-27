@@ -9,7 +9,8 @@ const bcryptjs = require('bcryptjs');
 const {User} = db.models;
 const router = express.Router();
 
-router.get('/users', authenticateUser, (req, res) => {
+// return user's info. Auth needed
+router.get('/users', authenticateUser, (req, res, next) => {
     const user = req.currentUser;
     res.json({
         firstName: user.firstName,
@@ -18,12 +19,18 @@ router.get('/users', authenticateUser, (req, res) => {
     });
 });
 
-router.post('/users', asyncHandler(async (req, res) => {
+// create user. No auth
+router.post('/users', asyncHandler(async (req, res, next) => {
     const user = req.body;
-    user.password = bcryptjs.hashSync(user.password);
+    if (user.password) {
+        user.password = bcryptjs.hashSync(user.password);
+    } else {
+        const error = new Error('`Password` is required');
+        error.status = 400;
+        throw error;
+    }
     await User.create(user);
-    // set location to "/"
-    res.status(201).end();
+    res.location('/').status(201).end();
 }));
 
 
