@@ -9,7 +9,7 @@ module.exports = (sequelize) => {
             autoIncrement: true,
         },
         title: {
-            type: Sequelize.TEXT,
+            type: Sequelize.STRING,
             allowNull: false,
             defaultValue: '',
             validate: {
@@ -19,7 +19,7 @@ module.exports = (sequelize) => {
             }
         },
         description: {
-            type: Sequelize.STRING,
+            type: Sequelize.TEXT,
             allowNull: false,
             defaultValue: '',
             validate: {

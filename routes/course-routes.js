@@ -8,6 +8,22 @@ const authenticateUser = require("./authenticateUser.js")
 const {User, Course} = db.models;
 const router = express.Router();
 
+// this function validate a update or create request by verifing if all necessary fields are set.
+function validateCourse(course) {
+    const errors = [];
+    if (!course.title || course.title == '') {
+        errors.push('`Title` is required');
+    }
+    if (!course.description || course.description == '') {
+        errors.push('`Description` is required');
+    }
+    if (errors.length) {
+        const error = new Error(errors.join(" - "));
+        error.status = 400;
+        throw error;
+    }
+}
+
 // this function replace the attribut userId by the attribut owner containing an user object
 async function appendUser(course) {
     const {userId, ...values} = course.dataValues;
@@ -38,8 +54,9 @@ router.post('/courses', authenticateUser, asyncHandler(async (req, res) => {
     const user = req.currentUser;
     const course = req.body;
     course.userId = user.id;
-    await Course.create(course);
-    res.location('/').status(201).end();
+    validateCourse(course)
+    const courseData = await Course.create(course);
+    res.location(`/course/${courseData.id}`).status(201).end();
 }));
 
 // get a course by id. No auth
@@ -59,6 +76,7 @@ router.get('/courses/:id', asyncHandler(async (req, res) => {
 // update a course. Auth needed
 router.put('/courses/:id', authenticateUser, asyncHandler(async (req, res) => {
     const user = req.currentUser;
+    validateCourse(req.body);
     const course = await Course.findByPk(req.params.id);
     if (course) {
         if (course.userId == user.id) {
